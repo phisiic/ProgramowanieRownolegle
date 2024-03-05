@@ -1,0 +1,20 @@
+d_local_private
+WAR - a_shared - W 41 - R 36;   
+
+for a_shared
+WAR - a_shared - W 41 - R 41  
+RAW - a_shared - W 41 - R 41
+WAW - a_shared - W 41 - R 41
+
+for e_atomic
+WAR - e_atomic - W 50 - R 50  
+RAW - e_atomic - W 50 - R 50
+WAW - e_atomic - W 50 - R 50
+
+printf("\n w obszarze równoległym: )
+RAW - a_shared - W 41 - R 57
+RAW - e_atomic - W 50 - R 61
+
+Rozpisać pętle -> a = a+1 itd.
+
+

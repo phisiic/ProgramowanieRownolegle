@@ -1,0 +1,134 @@
+#include<stdlib.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<pthread.h>
+
+#include"czytelnia.h"
+
+void inicjuj(czytelnia_t* czytelnia_p){
+    czytelnia_p->liczba_czyt = 0;
+    czytelnia_p->liczba_pisz = 0;
+    czytelnia_p->liczba_oczekujacych_czyt = 0;
+    czytelnia_p->liczba_oczekujacych_pisz = 0;
+    pthread_cond_init(&(czytelnia_p->czytelnicy), NULL);
+    pthread_cond_init(&(czytelnia_p->pisarze), NULL);
+    pthread_mutex_init(&(czytelnia_p->mutex), NULL);
+}
+
+
+/*** Implementacja procedur interfejsu ***/
+
+int my_read_lock_lock(czytelnia_t* czytelnia_p){
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    if(czytelnia_p->liczba_pisz > 0 || czytelnia_p->liczba_oczekujacych_pisz != 0){
+        czytelnia_p->liczba_oczekujacych_czyt++;
+        pthread_cond_wait(&(czytelnia_p->czytelnicy), &(czytelnia_p->mutex));
+        czytelnia_p->liczba_oczekujacych_czyt--;
+    }
+    czytelnia_p->liczba_czyt++;
+    pthread_cond_broadcast(&(czytelnia_p->czytelnicy));
+    pthread_mutex_unlock(&(czytelnia_p->mutex));
+    return 0;
+}
+
+
+int my_read_lock_unlock(czytelnia_t* czytelnia_p){
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    czytelnia_p->liczba_pisz--;
+    if(czytelnia_p->liczba_czyt == 0)
+        pthread_cond_signal(&(czytelnia_p->pisarze));
+    pthread_mutex_unlock(&(czytelnia_p->mutex));
+   return 0;
+}
+
+
+int my_write_lock_lock(czytelnia_t* czytelnia_p){
+  pthread_mutex_lock(&(czytelnia_p->mutex));
+    if((czytelnia_p->liczba_czyt + czytelnia_p->liczba_pisz) > 0){
+        czytelnia_p->liczba_oczekujacych_pisz ++;
+        pthread_cond_wait(&(czytelnia_p->pisarze), &(czytelnia_p->mutex)); 
+        czytelnia_p->liczba_oczekujacych_pisz --;
+  }
+  czytelnia_p->liczba_pisz++;
+  pthread_mutex_unlock(&(czytelnia_p->mutex));
+  return 0;
+}
+
+
+int my_write_lock_unlock(czytelnia_t* czytelnia_p){
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    czytelnia_p->liczba_pisz--;
+    if(czytelnia_p->liczba_oczekujacych_czyt != 0)
+        pthread_cond_broadcast(&(czytelnia_p->czytelnicy));
+    else
+        pthread_cond_signal(&(czytelnia_p->pisarze));
+
+    pthread_mutex_unlock(&(czytelnia_p->mutex));
+    return 0;
+}
+
+
+void czytam(czytelnia_t* czytelnia_p){
+
+// wypisanie wartości zmiennych kontrolujących działanie: liczby czytelników i pisarzy
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    int l_p = czytelnia_p->liczba_pisz;
+    int l_c = czytelnia_p->liczba_czyt;
+    printf("CZYTAM\n");
+    printf("\n\n\tczytelnik: %lu", pthread_self());
+    printf("\n\tczytam():");
+    printf("\n\tLiczba pisarzy: %d", czytelnia_p->liczba_pisz);
+    printf("\n\tLiczba czytelnikow: %d\n\n", czytelnia_p->liczba_czyt);
+
+// sprawdzenie warunku poprawności i ewentualny exit
+    if( l_p>1 || (l_p==1 && l_c>0) || l_p<0 || l_c<0 ) { 
+        printf("CZYTAM - niepoprawna ilosc czytelnikow lub pisarzy\n"); exit(0); }
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    usleep(rand()%300000);
+}
+
+void pisze(czytelnia_t* czytelnia_p){
+// wypisanie wartości zmiennych kontrolujących działanie: liczby czytelników i pisarzy
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    int l_p = czytelnia_p->liczba_pisz;
+    int l_c = czytelnia_p->liczba_czyt;
+    printf("PISZE\n")
+    printf("\n\n\tczytelnik: %lu", pthread_self());
+    printf("\n\tczytam():");
+    printf("\n\tLiczba pisarzy: %d", czytelnia_p->liczba_pisz);
+    printf("\n\tLiczba czytelnikow: %d\n\n", czytelnia_p->liczba_czyt);
+
+// sprawdzenie warunku poprawności i ewentualny exit
+    if( l_p>1 || (l_p==1 && l_c>0) || l_p<0 || l_c<0 ) { 
+        printf("CZYTAM - niepoprawna ilosc czytelnikow lub pisarzy\n"); exit(0); }
+    pthread_mutex_lock(&(czytelnia_p->mutex));
+    usleep(rand()%300000);
+}
+
+
+#ifndef _czytelnia_
+#define _czytelnia_
+
+/*** Definicje typow zmiennych ***/
+typedef struct {
+  // <- zasoby czytelni
+  int liczba_czyt;
+  int liczba_pisz;
+  int liczba_oczekujacych_czyt;
+  int liczba_oczekujacych_pisz;
+  pthread_cond_t czytelnicy;
+  pthread_cond_t pisarze;
+  pthread_mutex_t mutex;
+} czytelnia_t;
+
+/*** Deklaracje procedur interfejsu ***/
+void inicjuj(czytelnia_t* czytelnia_p);
+void czytam(czytelnia_t* czytelnia_p);
+void pisze(czytelnia_t* czytelnia_p);
+
+int my_read_lock_lock(czytelnia_t* czytelnia_p);
+int my_read_lock_unlock(czytelnia_t* czytelnia_p);
+int my_write_lock_lock(czytelnia_t* czytelnia_p);
+int my_write_lock_unlock(czytelnia_t* czytelnia_p);
+
+#endif
